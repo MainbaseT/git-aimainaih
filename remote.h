@@ -4,6 +4,7 @@
 #include "hash.h"
 #include "hashmap.h"
 #include "refspec.h"
+#include "string-list.h"
 #include "strvec.h"
 
 struct option;
@@ -58,6 +59,13 @@ struct remote_state {
 void remote_state_clear(struct remote_state *remote_state);
 struct remote_state *remote_state_new(void);
 
+	enum follow_remote_head_settings {
+		FOLLOW_REMOTE_NEVER = -1,
+		FOLLOW_REMOTE_CREATE = 0,
+		FOLLOW_REMOTE_WARN = 1,
+		FOLLOW_REMOTE_ALWAYS = 2,
+	};
+
 struct remote {
 	struct hashmap_entry ent;
 
@@ -104,6 +112,11 @@ struct remote {
 
 	/* The method used for authenticating against `http_proxy`. */
 	char *http_proxy_authmethod;
+
+	struct string_list server_options;
+
+	enum follow_remote_head_settings follow_remote_head;
+	const char *no_warn_branch;
 };
 
 /**
@@ -126,12 +139,14 @@ int remote_has_url(struct remote *remote, const char *url);
 struct strvec *push_url_of_remote(struct remote *remote);
 
 struct ref_push_report {
-	const char *ref_name;
+	char *ref_name;
 	struct object_id *old_oid;
 	struct object_id *new_oid;
 	unsigned int forced_update:1;
 	struct ref_push_report *next;
 };
+
+void ref_push_report_free(struct ref_push_report *);
 
 struct ref {
 	struct ref *next;
@@ -329,7 +344,7 @@ struct branch {
 struct branch *branch_get(const char *name);
 const char *remote_for_branch(struct branch *branch, int *explicit);
 const char *pushremote_for_branch(struct branch *branch, int *explicit);
-const char *remote_ref_for_branch(struct branch *branch, int for_push);
+char *remote_ref_for_branch(struct branch *branch, int for_push);
 
 /* returns true if the given branch has merge configuration given. */
 int branch_has_merge_config(struct branch *branch);
@@ -409,6 +424,7 @@ struct push_cas_option {
 };
 
 int parseopt_push_cas_option(const struct option *, const char *arg, int unset);
+void clear_cas_option(struct push_cas_option *);
 
 int is_empty_cas(const struct push_cas_option *);
 void apply_push_cas(struct push_cas_option *, struct remote *, struct ref *);
